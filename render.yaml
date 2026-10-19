@@ -35,9 +35,9 @@ services:
       - key: JWT_SECRET
         generateValue: true
       - key: CORS_ORIGINS
-        value: https://medifind-kosovo.vercel.app
+        value: https://medifind-kosovo-pi.vercel.app
       - key: WEB_APP_URL
-        value: https://medifind-kosovo.vercel.app
+        value: https://medifind-kosovo-pi.vercel.app
       # Browser → Vercel (rewrite proxy) → Render load balancer → API: two proxies in front.
       - key: TRUST_PROXY
         value: "2"
