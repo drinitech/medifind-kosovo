@@ -1,0 +1,43 @@
+# Render Blueprint — MediFind Kosovo API (apps/api).
+# Create it once in the Render dashboard: New → Blueprint → select this repo.
+# DATABASE_URL / DIRECT_DATABASE_URL are entered in the dashboard (sync: false) and never committed.
+services:
+  - type: web
+    name: medifind-api
+    runtime: node
+    plan: free
+    region: frankfurt # same region as the Neon database (aws-eu-central-1)
+    branch: main
+    autoDeploy: true
+    buildFilter:
+      paths:
+        - apps/api/**
+        - package.json
+        - pnpm-lock.yaml
+        - pnpm-workspace.yaml
+        - render.yaml
+    # Only the API workspace is installed; devDependencies are needed to compile (Nest CLI, TypeScript, Prisma).
+    buildCommand: >-
+      npx --yes pnpm@11.21.0 install --filter api --frozen-lockfile --prod=false &&
+      npx --yes pnpm@11.21.0 --filter api exec prisma migrate deploy &&
+      npx --yes pnpm@11.21.0 --filter api build
+    startCommand: node apps/api/dist/main.js
+    healthCheckPath: /api/v1/health
+    envVars:
+      - key: NODE_VERSION
+        value: "24"
+      - key: NODE_ENV
+        value: production
+      - key: DATABASE_URL
+        sync: false
+      - key: DIRECT_DATABASE_URL
+        sync: false
+      - key: JWT_SECRET
+        generateValue: true
+      - key: CORS_ORIGINS
+        value: https://medifind-kosovo.vercel.app
+      - key: WEB_APP_URL
+        value: https://medifind-kosovo.vercel.app
+      # Browser → Vercel (rewrite proxy) → Render load balancer → API: two proxies in front.
+      - key: TRUST_PROXY
+        value: "2"
