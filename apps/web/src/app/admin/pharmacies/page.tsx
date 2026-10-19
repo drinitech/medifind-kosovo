@@ -17,6 +17,7 @@ import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { useApi } from "@/hooks/use-api";
+import { useUrlSyncedState } from "@/hooks/use-url-synced-state";
 import { api, errorMessage } from "@/lib/api";
 import { dateOnly, timeAgo, placeLabel } from "@/lib/format";
 import type { Paginated } from "@/lib/types";
@@ -54,7 +55,8 @@ export default function AdminPharmaciesPage() {
 function PharmaciesAdmin() {
   const params = useSearchParams();
   const [q, setQ] = useState("");
-  const [status, setStatus] = useState<StatusFilter>((params.get("status") as StatusFilter) ?? "all");
+  const [statusRaw, setStatus] = useUrlSyncedState(params.get("status"), "all");
+  const status = statusRaw as StatusFilter;
   const [page, setPage] = useState(1);
   const { data, error, loading, reload } = useApi<Paginated<AdminPharmacy>>("/admin/pharmacies", { q: q.trim() || undefined, status, page, pageSize: 15 });
 

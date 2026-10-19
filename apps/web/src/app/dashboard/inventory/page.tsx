@@ -33,6 +33,7 @@ import { Input } from "@/components/ui/input";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
 import { useApi } from "@/hooks/use-api";
+import { useUrlSyncedState } from "@/hooks/use-url-synced-state";
 import { api, errorMessage } from "@/lib/api";
 import { dateTime, timeAgo } from "@/lib/format";
 import { DOSAGE_FORM_LABELS, SOURCE_LABELS, STATUS_LABELS } from "@/lib/labels";
@@ -54,14 +55,25 @@ function InventoryView({ pharmacyId }: { pharmacyId: string }) {
   const router = useRouter();
   const pathname = usePathname();
   const [q, setQ] = useState("");
-  const [status, setStatus] = useState(params.get("status") ?? ALL);
+  const [status, setStatus] = useUrlSyncedState(params.get("status"), ALL);
   const [active, setActive] = useState<"active" | "inactive" | "all">("active");
-  const [freshness, setFreshness] = useState(params.get("freshness") ?? ALL);
+  const [freshness, setFreshness] = useUrlSyncedState(params.get("freshness"), ALL);
   const [sorting, setSorting] = useState<SortingState>([{ id: "medicine", desc: false }]);
   const [page, setPage] = useState(1);
   const [rowSelection, setRowSelection] = useState<RowSelectionState>({});
   const [editing, setEditing] = useState<InventoryEntry | null>(null);
-  const [formOpen, setFormOpen] = useState(params.get("new") === "1");
+  const [formOpen, setFormOpen] = useState(false);
+  // "?new=1" (e.g. from the overview's "Shto bar") opens the add dialog. The page may be kept
+  // alive between visits (Cache Components / <Activity>), so react to the URL, not to mount.
+  const wantsNew = params.get("new") === "1";
+  const [handledNew, setHandledNew] = useState(false);
+  if (wantsNew && !handledNew) {
+    setHandledNew(true);
+    setEditing(null);
+    setFormOpen(true);
+  } else if (!wantsNew && handledNew) {
+    setHandledNew(false);
+  }
   const [bulkBusy, setBulkBusy] = useState(false);
 
   const sort = sorting[0];
@@ -409,7 +421,10 @@ function InventoryView({ pharmacyId }: { pharmacyId: string }) {
         open={formOpen}
         onOpenChange={(o) => {
           setFormOpen(o);
-          if (!o) setEditing(null);
+          if (!o) {
+            setEditing(null);
+            if (wantsNew) router.replace(pathname, { scroll: false });
+          }
         }}
         entry={editing}
         pharmacyId={pharmacyId}

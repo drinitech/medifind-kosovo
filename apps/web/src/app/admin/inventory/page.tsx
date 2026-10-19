@@ -17,6 +17,7 @@ import { Input } from "@/components/ui/input";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
 import { useApi } from "@/hooks/use-api";
+import { useUrlSyncedState } from "@/hooks/use-url-synced-state";
 import { api, errorMessage } from "@/lib/api";
 import { dateTime, timeAgo } from "@/lib/format";
 import { SOURCE_LABELS, STATUS_LABELS } from "@/lib/labels";
@@ -48,7 +49,7 @@ function AdminInventory() {
   const params = useSearchParams();
   const [q, setQ] = useState("");
   const [status, setStatus] = useState(ALL);
-  const [freshness, setFreshness] = useState(params.get("freshness") ?? ALL);
+  const [freshness, setFreshness] = useUrlSyncedState(params.get("freshness"), ALL);
   const [active, setActive] = useState<"active" | "inactive" | "all">("active");
   const [page, setPage] = useState(1);
   const [historyPage, setHistoryPage] = useState(1);
