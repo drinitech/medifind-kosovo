@@ -12,7 +12,7 @@ import { STATUS_LABELS } from "@/lib/labels";
 import type { AvailabilityStatus, FreshnessThresholds, HistoryEntry, Role } from "@/lib/types";
 
 interface Dashboard {
-  pharmacies: { total: number; verified: number; unverified: number; inactive: number; withStaleInventory: number };
+  pharmacies: { total: number; verified: number; unverified: number; directoryListings: number; inactive: number; withStaleInventory: number };
   medicines: { total: number; active: number };
   users: Partial<Record<Role, number>>;
   inventory: { byStatus: Partial<Record<AvailabilityStatus, number>>; freshness: { fresh: number; aging: number; stale: number }; updatesLast24h: number };
@@ -43,7 +43,7 @@ export default function AdminDashboardPage() {
       <PageHeader title="Paneli i administratorit" description="Statistikat llogariten drejtpërdrejt nga baza e të dhënave." />
 
       <div className="grid gap-4 sm:grid-cols-2 xl:grid-cols-4">
-        <Stat icon={Building2} label="Farmaci të regjistruara" value={data.pharmacies.total} hint={`${data.pharmacies.inactive} të çaktivizuara`} href="/admin/pharmacies" />
+        <Stat icon={Building2} label="Farmaci gjithsej" value={data.pharmacies.total} hint={`${data.pharmacies.directoryListings} nga OpenStreetMap · ${data.pharmacies.inactive} të çaktivizuara`} href="/admin/pharmacies" />
         <Stat icon={BadgeCheck} label="Të verifikuara" value={data.pharmacies.verified} hint={`${data.pharmacies.unverified} në pritje`} href="/admin/pharmacies?status=unverified" />
         <Stat icon={Pill} label="Produkte në katalog" value={data.medicines.active} hint={`${data.medicines.total - data.medicines.active} joaktive`} href="/admin/medicines" />
         <Stat icon={Users} label="Përdorues" value={userTotal} hint={`${data.users.PHARMACY_MANAGER ?? 0} menaxherë · ${data.users.ADMIN ?? 0} admin`} href="/admin/users" />

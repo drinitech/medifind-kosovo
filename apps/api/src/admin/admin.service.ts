@@ -1,5 +1,5 @@
 import { BadRequestException, ConflictException, Injectable, NotFoundException } from '@nestjs/common';
-import { MembershipRole, NotificationType, Prisma, Role } from '@prisma/client';
+import { MembershipRole, NotificationType, PharmacySource, Prisma, Role } from '@prisma/client';
 import { AuditService } from '../audit/audit.service';
 import { AuthUser } from '../common/decorators/auth.decorators';
 import { paginate, skipTake } from '../common/dto/pagination.dto';
@@ -50,10 +50,17 @@ export class AdminService {
     const agingCutoff = this.presenter.agingCutoff(now);
     const activeInv = { isActive: true, pharmacy: { isActive: true } } satisfies Prisma.PharmacyInventoryWhereInput;
 
+    const pendingWhere = {
+      isVerified: false,
+      isActive: true,
+      dataSource: { not: PharmacySource.OSM },
+    } satisfies Prisma.PharmacyWhereInput;
     const [
       pharmaciesTotal,
       pharmaciesVerified,
       pharmaciesInactive,
+      pharmaciesPending,
+      directoryListings,
       medicinesTotal,
       medicinesActive,
       usersByRole,
@@ -71,6 +78,8 @@ export class AdminService {
       this.prisma.pharmacy.count(),
       this.prisma.pharmacy.count({ where: { isVerified: true, isActive: true } }),
       this.prisma.pharmacy.count({ where: { isActive: false } }),
+      this.prisma.pharmacy.count({ where: pendingWhere }),
+      this.prisma.pharmacy.count({ where: { isVerified: false, isActive: true, dataSource: PharmacySource.OSM } }),
       this.prisma.medicine.count(),
       this.prisma.medicine.count({ where: { isActive: true } }),
       this.prisma.user.groupBy({ by: ['role'], _count: { _all: true } }),
@@ -83,7 +92,7 @@ export class AdminService {
       this.prisma.inventoryHistory.count({ where: { createdAt: { gte: new Date(now.getTime() - 86_400_000) } } }),
       this.prisma.inventoryHistory.findMany({ orderBy: { createdAt: 'desc' }, take: 10, select: historySelect }),
       this.prisma.pharmacy.findMany({
-        where: { isVerified: false, isActive: true },
+        where: pendingWhere,
         orderBy: { createdAt: 'asc' },
         take: 5,
         select: { id: true, name: true, city: true, createdAt: true },
@@ -103,7 +112,8 @@ export class AdminService {
       pharmacies: {
         total: pharmaciesTotal,
         verified: pharmaciesVerified,
-        unverified: pharmaciesTotal - pharmaciesVerified - pharmaciesInactive,
+        unverified: pharmaciesPending,
+        directoryListings,
         inactive: pharmaciesInactive,
         withStaleInventory: stalePharmacies,
       },
@@ -126,7 +136,10 @@ export class AdminService {
   async pharmacies(query: AdminPharmaciesQueryDto) {
     const where: Prisma.PharmacyWhereInput = {};
     if (query.status === 'verified') Object.assign(where, { isVerified: true, isActive: true });
-    if (query.status === 'unverified') Object.assign(where, { isVerified: false, isActive: true });
+    if (query.status === 'unverified') {
+      Object.assign(where, { isVerified: false, isActive: true, dataSource: { not: PharmacySource.OSM } });
+    }
+    if (query.status === 'directory') Object.assign(where, { isVerified: false, isActive: true, dataSource: PharmacySource.OSM });
     if (query.status === 'inactive') where.isActive = false;
     if (query.q) {
       where.OR = [
@@ -138,7 +151,8 @@ export class AdminService {
     const [items, total] = await this.prisma.$transaction([
       this.prisma.pharmacy.findMany({
         where,
-        orderBy: [{ isVerified: 'asc' }, { createdAt: 'desc' }],
+        // Pending registrations first, then OSM listings, then verified pharmacies.
+        orderBy: [{ isVerified: 'asc' }, { dataSource: 'asc' }, { createdAt: 'desc' }],
         ...skipTake(query),
         include: {
           memberships: { select: { role: true, user: { select: { id: true, fullName: true, email: true } } } },

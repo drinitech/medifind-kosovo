@@ -565,6 +565,53 @@ describe('MediFind Kosovo API (e2e)', () => {
     });
   });
 
+  // ---------------------------------------------------------------- directory listings
+  describe('OpenStreetMap directory listings', () => {
+    it('are listed in the directory and map but never show availability', async () => {
+      const listing = await prisma.pharmacy.create({
+        data: {
+          name: 'Farmacia OSM',
+          slug: 'farmacia-osm',
+          address: null,
+          city: 'Prishtinë',
+          latitude: 42.66,
+          longitude: 21.17,
+          dataSource: 'OSM',
+          externalId: 'osm:node/1',
+          isVerified: false,
+        },
+      });
+      // Even if inventory rows existed for a listing, they must not surface publicly.
+      await prisma.pharmacyInventory.create({
+        data: { pharmacyId: listing.id, medicineId: med.para500, availabilityStatus: 'IN_STOCK', quantity: 5 },
+      });
+
+      const list = await request(http).get(`${API}/pharmacies`).query({ q: 'OSM' }).expect(200);
+      expect(list.body.data.items).toEqual([expect.objectContaining({ id: listing.id, isVerified: false, dataSource: 'OSM', address: null })]);
+      const participating = await request(http).get(`${API}/pharmacies`).query({ q: 'OSM', participating: 'true' }).expect(200);
+      expect(participating.body.data.items).toHaveLength(0);
+
+      const nearby = await request(http).get(`${API}/pharmacies/nearby`).query({ lat: 42.66, lng: 21.17, radiusKm: 1 }).expect(200);
+      expect(nearby.body.data.map((p: { id: string }) => p.id)).toContain(listing.id);
+
+      const profile = await request(http).get(`${API}/pharmacies/farmacia-osm`).expect(200);
+      expect(profile.body.data).toMatchObject({ isVerified: false, stats: null });
+      await request(http).get(`${API}/pharmacies/farmacia-osm/inventory`).expect(404);
+
+      const availability = await request(http).get(`${API}/medicines/${med.para500}/availability`).expect(200);
+      expect(availability.body.data.items.map((r: { pharmacy: { id: string } }) => r.pharmacy.id)).not.toContain(listing.id);
+    });
+
+    it('are kept apart from pending registrations in the admin views', async () => {
+      const dash = await admin.get(`${API}/admin/dashboard`).expect(200);
+      expect(dash.body.data.pharmacies).toMatchObject({ directoryListings: 1, unverified: 0 });
+      const directory = await admin.get(`${API}/admin/pharmacies`).query({ status: 'directory' }).expect(200);
+      expect(directory.body.data.items.map((p: { slug: string }) => p.slug)).toEqual(['farmacia-osm']);
+      const pending = await admin.get(`${API}/admin/pharmacies`).query({ status: 'unverified' }).expect(200);
+      expect(pending.body.data.items).toHaveLength(0);
+    });
+  });
+
   // ---------------------------------------------------------------- errors
   describe('error handling', () => {
     it('uses a consistent error envelope and does not leak internals', async () => {

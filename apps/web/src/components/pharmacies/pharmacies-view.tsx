@@ -4,7 +4,7 @@ import { Building2, MapPin, Phone } from "lucide-react";
 import Link from "next/link";
 import { useMemo, useRef, useState } from "react";
 import { Pager } from "@/components/common/pager";
-import { DemoBadge } from "@/components/common/status";
+import { DemoBadge, ParticipationBadge } from "@/components/common/status";
 import { EmptyState, ErrorState, ListSkeleton, PageHeader } from "@/components/common/states";
 import { LazyPharmacyMap, type MapMarker } from "@/components/map/lazy-map";
 import { type ChosenLocation, LocationPicker } from "@/components/map/location-picker";
@@ -13,8 +13,9 @@ import { Card } from "@/components/ui/card";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
+import { Switch } from "@/components/ui/switch";
 import { useApi } from "@/hooks/use-api";
-import { km, telHref } from "@/lib/format";
+import { km, telHref, placeLabel } from "@/lib/format";
 import type { Paginated, PharmacySummary } from "@/lib/types";
 
 const ALL = "__all";
@@ -25,6 +26,7 @@ export function PharmaciesView() {
   const [city, setCity] = useState(ALL);
   const [q, setQ] = useState("");
   const [page, setPage] = useState(1);
+  const [participatingOnly, setParticipatingOnly] = useState(false);
   const [selected, setSelected] = useState<string | null>(null);
   const mapRef = useRef<HTMLDivElement>(null);
 
@@ -38,11 +40,12 @@ export function PharmaciesView() {
   const list = useApi<Paginated<PharmacySummary>>(location ? null : "/pharmacies", {
     q: q.trim() || undefined,
     city: city === ALL ? undefined : city,
+    participating: participatingOnly || undefined,
     page,
     pageSize: 12,
   });
 
-  const items = location ? nearby.data : list.data?.items;
+  const items = location ? nearby.data?.filter((p) => !participatingOnly || p.isVerified) : list.data?.items;
   const state = location ? nearby : list;
   const markers = useMemo<MapMarker[]>(
     () =>
@@ -51,9 +54,10 @@ export function PharmaciesView() {
         lat: p.latitude,
         lng: p.longitude,
         title: p.name,
-        subtitle: `${p.address}, ${p.city}`,
+        subtitle: placeLabel(p),
         href: `/pharmacies/${p.slug}`,
         phone: p.phone,
+        listing: !p.isVerified,
       })),
     [items],
   );
@@ -62,10 +66,10 @@ export function PharmaciesView() {
     <div className="mx-auto max-w-6xl space-y-6 px-4 py-8">
       <PageHeader
         title="Farmacitë"
-        description="Farmacitë e verifikuara në MediFind. Zgjidhni një vendndodhje për t’i renditur sipas distancës."
+        description="Farmacitë në Kosovë. Ato që raportojnë inventar shfaqen të parat; të tjerat vijnë nga OpenStreetMap dhe nuk kanë të dhëna për barnat."
       />
       <div className="grid gap-6 lg:grid-cols-[minmax(0,1fr)_440px]">
-        <div className="space-y-4">
+        <div className="min-w-0 space-y-4">
           <Card className="gap-4 p-4">
             <LocationPicker value={location} onChange={(l) => { setLocation(l); setSelected(null); }} />
             <div className="flex flex-wrap items-end gap-3 border-t pt-4">
@@ -107,6 +111,10 @@ export function PharmaciesView() {
                   </div>
                 </>
               )}
+              <div className="flex h-9 items-center gap-2">
+                <Switch id="ph-participating" checked={participatingOnly} onCheckedChange={(c) => { setParticipatingOnly(c); setPage(1); }} />
+                <Label htmlFor="ph-participating" className="text-sm font-normal">Vetëm ato që raportojnë inventar</Label>
+              </div>
             </div>
           </Card>
 
@@ -118,7 +126,7 @@ export function PharmaciesView() {
             <EmptyState
               icon={Building2}
               title="Nuk u gjet asnjë farmaci"
-              description={location ? "Asnjë farmaci e verifikuar brenda kësaj distance. Provoni një rreze më të madhe." : "Provoni një kërkim ose qytet tjetër."}
+              description={location ? "Asnjë farmaci brenda kësaj distance. Provoni një rreze më të madhe." : "Provoni një kërkim ose qytet tjetër."}
             />
           ) : (
             <>
@@ -130,12 +138,12 @@ export function PharmaciesView() {
                         <Link href={`/pharmacies/${p.slug}`} className="font-semibold hover:text-primary hover:underline">
                           {p.name}
                         </Link>
-                        {p.isDemo ? <DemoBadge /> : null}
+                        {p.isDemo ? <DemoBadge /> : <ParticipationBadge verified={p.isVerified} className="shrink-0" />}
                       </div>
                       <p className="flex items-start gap-1.5 text-sm text-muted-foreground">
                         <MapPin className="mt-0.5 size-3.5 shrink-0" aria-hidden />
                         <span>
-                          {p.address}, {p.city}
+                          {placeLabel(p)}
                           {p.distanceKm !== undefined ? <strong className="ml-1 font-medium text-foreground">· {km(p.distanceKm)}</strong> : null}
                         </span>
                       </p>

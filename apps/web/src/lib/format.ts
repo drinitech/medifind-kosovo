@@ -30,3 +30,8 @@ export function telHref(phone: string): string {
 export function directionsHref(lat: number, lng: number): string {
   return `https://www.openstreetmap.org/directions?to=${lat}%2C${lng}#map=16/${lat}/${lng}`;
 }
+
+/** "Rruga X 12, Prishtinë" — or just the city when the street address is unknown (common for OSM listings). */
+export function placeLabel(p: { address: string | null; city: string }): string {
+  return [p.address, p.city].filter(Boolean).join(", ");
+}

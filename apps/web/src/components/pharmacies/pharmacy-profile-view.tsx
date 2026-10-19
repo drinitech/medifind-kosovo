@@ -4,7 +4,7 @@ import { ArrowLeft, BadgeCheck, Clock, Mail, MapPin, Navigation, Package, Phone 
 import Link from "next/link";
 import { useState } from "react";
 import { Pager } from "@/components/common/pager";
-import { DemoBadge, FreshnessBadge, ReportedNotice, StatusBadge } from "@/components/common/status";
+import { DemoBadge, FreshnessBadge, ParticipationBadge, ReportedNotice, StatusBadge } from "@/components/common/status";
 import { EmptyState, ErrorState, ListSkeleton } from "@/components/common/states";
 import { LazyPharmacyMap } from "@/components/map/lazy-map";
 import { Button } from "@/components/ui/button";
@@ -13,7 +13,7 @@ import { Input } from "@/components/ui/input";
 import { Skeleton } from "@/components/ui/skeleton";
 import { Tabs, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { useApi } from "@/hooks/use-api";
-import { dateOnly, dateTime, directionsHref, telHref, timeAgo } from "@/lib/format";
+import { dateOnly, dateTime, directionsHref, telHref, timeAgo, placeLabel } from "@/lib/format";
 import { DOSAGE_FORM_LABELS } from "@/lib/labels";
 import type { Paginated, PharmacyDetail, PublicInventoryRow } from "@/lib/types";
 
@@ -22,7 +22,8 @@ export function PharmacyProfileView({ id }: { id: string }) {
   const [q, setQ] = useState("");
   const [filter, setFilter] = useState<"all" | "available">("available");
   const [page, setPage] = useState(1);
-  const inventory = useApi<Paginated<PublicInventoryRow>>(pharmacy.data ? `/pharmacies/${pharmacy.data.id}/inventory` : null, {
+  // Directory listings report no inventory, so there is nothing to fetch for them.
+  const inventory = useApi<Paginated<PublicInventoryRow>>(pharmacy.data?.stats ? `/pharmacies/${pharmacy.data.id}/inventory` : null, {
     q: q.trim() || undefined,
     filter,
     page,
@@ -37,6 +38,8 @@ export function PharmacyProfileView({ id }: { id: string }) {
     );
   }
   const p = pharmacy.data;
+  const stats = p?.stats ?? null;
+  const osmUrl = p?.externalId?.startsWith("osm:") ? `https://www.openstreetmap.org/${p.externalId.slice(4)}` : null;
 
   return (
     <div className="mx-auto max-w-6xl space-y-6 px-4 py-8">
@@ -54,16 +57,44 @@ export function PharmacyProfileView({ id }: { id: string }) {
                   <h1 className="text-2xl font-semibold md:text-3xl">{p.name}</h1>
                   {p.isDemo ? <DemoBadge /> : null}
                 </div>
-                <p className="flex items-center gap-1.5 text-sm text-success">
-                  <BadgeCheck className="size-4" aria-hidden /> Farmaci e verifikuar{p.verifiedAt ? ` më ${dateOnly(p.verifiedAt)}` : ""}
-                </p>
+                {stats ? (
+                  <p className="flex items-center gap-1.5 text-sm text-success">
+                    <BadgeCheck className="size-4" aria-hidden /> Farmaci e verifikuar{p.verifiedAt ? ` më ${dateOnly(p.verifiedAt)}` : ""} · raporton inventar
+                  </p>
+                ) : (
+                  <ParticipationBadge verified={false} />
+                )}
               </div>
+              {!stats ? (
+                <div className="space-y-2 rounded-xl border bg-muted/50 p-4 text-sm">
+                  <p>
+                    Kjo farmaci nuk merr pjesë ende në MediFind, ndaj <strong>nuk ka të dhëna për disponueshmërinë e barnave</strong>.
+                    Telefononi farmacinë për të pyetur.
+                  </p>
+                  <p className="text-xs text-muted-foreground">
+                    Të dhënat e farmacisë: ©{" "}
+                    {osmUrl ? (
+                      <a href={osmUrl} target="_blank" rel="noreferrer" className="underline">kontribuesit e OpenStreetMap</a>
+                    ) : (
+                      "kontribuesit e OpenStreetMap"
+                    )}{" "}
+                    (ODbL){p.sourceUpdatedAt ? `, marrë më ${dateOnly(p.sourceUpdatedAt)}` : ""}. Mund të jenë të paplota ose të vjetruara.
+                  </p>
+                  <p>
+                    Është kjo farmacia juaj?{" "}
+                    <Link href="/register?type=pharmacy" className="font-medium text-primary hover:underline">
+                      Regjistrohuni si farmaci
+                    </Link>{" "}
+                    dhe administratori e lidh llogarinë tuaj me këtë profil.
+                  </p>
+                </div>
+              ) : null}
               <dl className="grid gap-3 text-sm sm:grid-cols-2">
                 <div className="flex gap-2">
                   <MapPin className="mt-0.5 size-4 shrink-0 text-muted-foreground" aria-hidden />
                   <div>
                     <dt className="sr-only">Adresa</dt>
-                    <dd>{p.address}, {p.city}</dd>
+                    <dd>{placeLabel(p)}{p.address ? null : <span className="text-muted-foreground"> (adresa e saktë nuk dihet)</span>}</dd>
                   </div>
                 </div>
                 <div className="flex gap-2">
@@ -82,15 +113,17 @@ export function PharmacyProfileView({ id }: { id: string }) {
                     </div>
                   </div>
                 ) : null}
-                <div className="flex gap-2">
-                  <Clock className="mt-0.5 size-4 shrink-0 text-muted-foreground" aria-hidden />
-                  <div>
-                    <dt className="sr-only">Përditësimi i fundit</dt>
-                    <dd title={dateTime(p.stats.lastInventoryUpdate)}>
-                      Inventari u përditësua {p.stats.lastInventoryUpdate ? timeAgo(p.stats.lastInventoryUpdate) : "— ende pa raport"}
-                    </dd>
+                {stats ? (
+                  <div className="flex gap-2">
+                    <Clock className="mt-0.5 size-4 shrink-0 text-muted-foreground" aria-hidden />
+                    <div>
+                      <dt className="sr-only">Përditësimi i fundit</dt>
+                      <dd title={dateTime(stats.lastInventoryUpdate)}>
+                        Inventari u përditësua {stats.lastInventoryUpdate ? timeAgo(stats.lastInventoryUpdate) : "— ende pa raport"}
+                      </dd>
+                    </div>
                   </div>
-                </div>
+                ) : null}
               </dl>
               <div className="flex flex-wrap gap-2">
                 {p.phone ? (
@@ -104,28 +137,30 @@ export function PharmacyProfileView({ id }: { id: string }) {
                   </a>
                 </Button>
               </div>
-              <div className="grid grid-cols-2 gap-3">
-                <div className="rounded-xl bg-muted p-3">
-                  <p className="text-2xl font-semibold">{p.stats.availableCount}</p>
-                  <p className="text-xs text-muted-foreground">barna të raportuara në dispozicion</p>
+              {stats ? (
+                <div className="grid grid-cols-2 gap-3">
+                  <div className="rounded-xl bg-muted p-3">
+                    <p className="text-2xl font-semibold">{stats.availableCount}</p>
+                    <p className="text-xs text-muted-foreground">barna të raportuara në dispozicion</p>
+                  </div>
+                  <div className="rounded-xl bg-muted p-3">
+                    <p className="text-2xl font-semibold">{stats.inventoryCount}</p>
+                    <p className="text-xs text-muted-foreground">barna në inventarin e raportuar</p>
+                  </div>
                 </div>
-                <div className="rounded-xl bg-muted p-3">
-                  <p className="text-2xl font-semibold">{p.stats.inventoryCount}</p>
-                  <p className="text-xs text-muted-foreground">barna në inventarin e raportuar</p>
-                </div>
-              </div>
+              ) : null}
               <p className="text-xs text-muted-foreground">Orari i punës nuk publikohet në MediFind — konfirmoni me farmacinë.</p>
             </CardContent>
           </Card>
           <LazyPharmacyMap
-            markers={[{ id: p.id, lat: p.latitude, lng: p.longitude, title: p.name, subtitle: `${p.address}, ${p.city}`, phone: p.phone }]}
+            markers={[{ id: p.id, lat: p.latitude, lng: p.longitude, title: p.name, subtitle: placeLabel(p), phone: p.phone, listing: !stats }]}
             selectedId={p.id}
             className="h-72 w-full rounded-xl border lg:h-full lg:min-h-80"
           />
         </div>
       )}
 
-      {p ? (
+      {p && stats ? (
         <Card>
           <CardHeader className="gap-3">
             <CardTitle className="text-lg">Inventari i raportuar</CardTitle>

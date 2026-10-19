@@ -15,10 +15,14 @@ export class AdminPharmaciesQueryDto extends PaginationQueryDto {
   @MaxLength(100)
   q?: string;
 
-  @ApiPropertyOptional({ enum: ['all', 'verified', 'unverified', 'inactive'], default: 'all' })
+  @ApiPropertyOptional({
+    enum: ['all', 'verified', 'unverified', 'directory', 'inactive'],
+    default: 'all',
+    description: 'unverified = pending registrations; directory = unclaimed OpenStreetMap listings',
+  })
   @IsOptional()
-  @IsIn(['all', 'verified', 'unverified', 'inactive'])
-  status: 'all' | 'verified' | 'unverified' | 'inactive' = 'all';
+  @IsIn(['all', 'verified', 'unverified', 'directory', 'inactive'])
+  status: 'all' | 'verified' | 'unverified' | 'directory' | 'inactive' = 'all';
 }
 
 export class VerifyPharmacyDto {

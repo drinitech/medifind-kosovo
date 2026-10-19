@@ -1,4 +1,4 @@
-import { AlertTriangle, CheckCircle2, CircleHelp, Clock, Info, PackageX } from "lucide-react";
+import { AlertTriangle, BadgeCheck, CheckCircle2, CircleHelp, Clock, Info, PackageX } from "lucide-react";
 import { Badge } from "@/components/ui/badge";
 import { Tooltip, TooltipContent, TooltipTrigger } from "@/components/ui/tooltip";
 import { FRESHNESS_HINTS, FRESHNESS_LABELS, REPORTED_NOTICE, STATUS_LABELS } from "@/lib/labels";
@@ -73,5 +73,27 @@ export function ReportedNotice({ className }: { className?: string }) {
       <Info className="mt-0.5 size-4 shrink-0" aria-hidden />
       <span>{REPORTED_NOTICE}</span>
     </p>
+  );
+}
+
+/** Whether a directory pharmacy participates in MediFind (verified, reports inventory) or is only a listing. */
+export function ParticipationBadge({ verified, className }: { verified: boolean | undefined; className?: string }) {
+  if (verified) {
+    return (
+      <Badge variant="outline" className={cn("gap-1 border-success/30 bg-success-soft text-success", className)}>
+        <BadgeCheck className="size-3.5" aria-hidden />
+        Raporton inventar
+      </Badge>
+    );
+  }
+  return (
+    <Tooltip>
+      <TooltipTrigger asChild>
+        <Badge variant="outline" tabIndex={0} className={cn("text-muted-foreground", className)}>
+          Nuk raporton inventar
+        </Badge>
+      </TooltipTrigger>
+      <TooltipContent>Farmaci nga OpenStreetMap. Nuk merr pjesë ende në MediFind, ndaj nuk ka të dhëna për barnat.</TooltipContent>
+    </Tooltip>
   );
 }

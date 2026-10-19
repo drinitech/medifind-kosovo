@@ -52,18 +52,24 @@ export interface MedicineDetail extends Medicine {
   variants: Medicine[];
 }
 
+export type PharmacySource = "REGISTRATION" | "OSM" | "SEED";
+
 export interface PharmacySummary {
   id: string;
   name: string;
   slug: string;
-  address: string;
+  /** Unknown for many OpenStreetMap listings. */
+  address: string | null;
   city: string;
   latitude: number;
   longitude: number;
   phone: string | null;
   email?: string | null;
   isDemo: boolean;
+  /** Verified pharmacies participate in MediFind and report inventory; others are directory listings. */
   isVerified?: boolean;
+  dataSource?: PharmacySource;
+  externalId?: string | null;
   distanceKm?: number;
 }
 
@@ -91,7 +97,9 @@ export interface AvailabilityResponse extends Paginated<AvailabilityRow> {
 
 export interface PharmacyDetail extends PharmacySummary {
   verifiedAt: string | null;
-  stats: { inventoryCount: number; availableCount: number; lastInventoryUpdate: string | null };
+  sourceUpdatedAt: string | null;
+  /** null for directory listings, which report no inventory. */
+  stats: { inventoryCount: number; availableCount: number; lastInventoryUpdate: string | null } | null;
 }
 
 export interface PublicInventoryRow {

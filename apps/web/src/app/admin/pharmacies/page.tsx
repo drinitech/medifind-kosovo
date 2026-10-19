@@ -18,7 +18,7 @@ import { Label } from "@/components/ui/label";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { useApi } from "@/hooks/use-api";
 import { api, errorMessage } from "@/lib/api";
-import { dateOnly, timeAgo } from "@/lib/format";
+import { dateOnly, timeAgo, placeLabel } from "@/lib/format";
 import type { Paginated } from "@/lib/types";
 
 interface AdminPharmacy {
@@ -30,6 +30,7 @@ interface AdminPharmacy {
   phone: string | null;
   email: string | null;
   isDemo: boolean;
+  dataSource: "REGISTRATION" | "OSM" | "SEED";
   isVerified: boolean;
   isActive: boolean;
   verifiedAt: string | null;
@@ -40,7 +41,7 @@ interface AdminPharmacy {
   lastInventoryUpdate: string | null;
 }
 
-type StatusFilter = "all" | "verified" | "unverified" | "inactive";
+type StatusFilter = "all" | "verified" | "unverified" | "directory" | "inactive";
 
 export default function AdminPharmaciesPage() {
   return (
@@ -78,6 +79,7 @@ function PharmaciesAdmin() {
           <SelectContent>
             <SelectItem value="all">Të gjitha</SelectItem>
             <SelectItem value="unverified">Në pritje të verifikimit</SelectItem>
+            <SelectItem value="directory">Nga OpenStreetMap (pa pronar)</SelectItem>
             <SelectItem value="verified">Të verifikuara</SelectItem>
             <SelectItem value="inactive">Të çaktivizuara</SelectItem>
           </SelectContent>
@@ -105,11 +107,13 @@ function PharmaciesAdmin() {
                           <Badge variant="outline" className="border-destructive/30 text-destructive">E çaktivizuar</Badge>
                         ) : p.isVerified ? (
                           <Badge variant="outline" className="gap-1 border-success/30 bg-success-soft text-success"><BadgeCheck className="size-3.5" aria-hidden /> E verifikuar</Badge>
+                        ) : p.dataSource === "OSM" ? (
+                          <Badge variant="outline">OpenStreetMap · pa pronar</Badge>
                         ) : (
                           <Badge variant="outline" className="border-warning/40 bg-warning-soft">Në pritje</Badge>
                         )}
                       </div>
-                      <p className="text-sm text-muted-foreground">{p.address}, {p.city} {p.phone ? `· ${p.phone}` : ""} {p.email ? `· ${p.email}` : ""}</p>
+                      <p className="text-sm text-muted-foreground">{placeLabel(p)} {p.phone ? `· ${p.phone}` : ""} {p.email ? `· ${p.email}` : ""}</p>
                       <p className="text-xs text-muted-foreground">
                         Regjistruar {dateOnly(p.createdAt)}
                         {p.verifiedAt ? ` · verifikuar ${dateOnly(p.verifiedAt)}${p.verifiedBy ? ` nga ${p.verifiedBy.fullName}` : ""}` : ""}

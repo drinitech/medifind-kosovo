@@ -17,6 +17,8 @@ export interface MapMarker {
   status?: AvailabilityStatus;
   href?: string;
   phone?: string | null;
+  /** Directory listing that does not report inventory — drawn as a grey pin. */
+  listing?: boolean;
 }
 
 export interface PharmacyMapProps {
@@ -35,6 +37,7 @@ const STATUS_COLORS: Record<AvailabilityStatus | "DEFAULT", string> = {
   UNKNOWN: "#64748b",
   DEFAULT: "#0f766e",
 };
+const LISTING_COLOR = "#94a3b8";
 
 function pinIcon(color: string, selected: boolean) {
   const size = selected ? 38 : 30;
@@ -51,11 +54,11 @@ function pinIcon(color: string, selected: boolean) {
 }
 
 const iconCache = new Map<string, L.DivIcon>();
-function iconFor(status: AvailabilityStatus | undefined, selected: boolean) {
-  const k = `${status ?? "DEFAULT"}-${selected}`;
+function iconFor(status: AvailabilityStatus | undefined, selected: boolean, listing = false) {
+  const k = `${listing ? "LISTING" : (status ?? "DEFAULT")}-${selected}`;
   let icon = iconCache.get(k);
   if (!icon) {
-    icon = pinIcon(STATUS_COLORS[status ?? "DEFAULT"], selected);
+    icon = pinIcon(listing ? LISTING_COLOR : STATUS_COLORS[status ?? "DEFAULT"], selected);
     iconCache.set(k, icon);
   }
   return icon;
@@ -129,7 +132,7 @@ export default function PharmacyMap({ markers, selectedId, userLocation, onSelec
         <Marker
           key={m.id}
           position={[m.lat, m.lng]}
-          icon={iconFor(m.status, m.id === selectedId)}
+          icon={iconFor(m.status, m.id === selectedId, m.listing)}
           title={m.title}
           alt={m.title}
           keyboard
@@ -143,6 +146,7 @@ export default function PharmacyMap({ markers, selectedId, userLocation, onSelec
               <p className="font-semibold">{m.title}</p>
               {m.subtitle ? <p className="text-muted-foreground">{m.subtitle}</p> : null}
               {m.status ? <p>{STATUS_LABELS[m.status]} (e raportuar)</p> : null}
+              {m.listing ? <p>Nuk raporton inventar në MediFind</p> : null}
               {m.phone ? <a href={`tel:${m.phone.replace(/[^+\d]/g, "")}`}>{m.phone}</a> : null}
               {m.href ? (
                 <p>

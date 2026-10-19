@@ -14,7 +14,9 @@
     "prisma:migrate": "prisma migrate dev",
     "prisma:deploy": "prisma migrate deploy",
     "seed": "ts-node --transpile-only prisma/seed.ts",
-    "postinstall": "prisma generate"
+    "postinstall": "prisma generate",
+    "import:osm": "ts-node --transpile-only prisma/scripts/import-osm-pharmacies.ts",
+    "remove:demo": "ts-node --transpile-only prisma/scripts/remove-demo-data.ts"
   },
   "dependencies": {
     "@nestjs/common": "^11.2.7",

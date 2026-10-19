@@ -16,6 +16,7 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@
 import { Skeleton } from "@/components/ui/skeleton";
 import { Switch } from "@/components/ui/switch";
 import { useApi } from "@/hooks/use-api";
+import { placeLabel } from "@/lib/format";
 import { DOSAGE_FORM_LABELS, STATUS_LABELS } from "@/lib/labels";
 import type { AvailabilityResponse, AvailabilityStatus, MedicineDetail } from "@/lib/types";
 import { AvailabilityCard } from "./availability-card";
@@ -52,7 +53,7 @@ export function MedicineView({ id }: { id: string }) {
         lat: r.pharmacy.latitude,
         lng: r.pharmacy.longitude,
         title: r.pharmacy.name,
-        subtitle: `${r.pharmacy.address}, ${r.pharmacy.city}`,
+        subtitle: placeLabel(r.pharmacy),
         status: r.availabilityStatus,
         href: `/pharmacies/${r.pharmacy.slug}`,
         phone: r.pharmacy.phone,

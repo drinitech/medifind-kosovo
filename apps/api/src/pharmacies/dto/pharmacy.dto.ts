@@ -1,6 +1,7 @@
 import { ApiProperty, ApiPropertyOptional, PartialType } from '@nestjs/swagger';
 import { Transform, Type } from 'class-transformer';
 import {
+  IsBoolean,
   IsEmail,
   IsIn,
   IsInt,
@@ -86,6 +87,12 @@ export class PharmacyScopeQueryDto {
 }
 
 export class ListPharmaciesQueryDto extends PaginationQueryDto {
+  @ApiPropertyOptional({ description: 'Only verified pharmacies that report inventory' })
+  @IsOptional()
+  @Transform(({ value }) => (value === 'true' ? true : value === 'false' ? false : value))
+  @IsBoolean()
+  participating?: boolean;
+
   @ApiPropertyOptional()
   @IsOptional()
   @Transform(emptyToUndefined)

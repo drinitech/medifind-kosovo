@@ -1,5 +1,5 @@
 import { ConflictException, ForbiddenException, Injectable, NotFoundException } from '@nestjs/common';
-import { MembershipRole, Prisma, Role } from '@prisma/client';
+import { MembershipRole, PharmacySource, Prisma, Role } from '@prisma/client';
 import { AuditService } from '../audit/audit.service';
 import { AuthUser } from '../common/decorators/auth.decorators';
 import { paginate, skipTake } from '../common/dto/pagination.dto';
@@ -18,6 +18,16 @@ import {
 } from './dto/pharmacy.dto';
 import { PharmacyAccessService } from './pharmacy-access.service';
 
+/**
+ * Pharmacies shown in the public directory and map: verified participants plus
+ * OpenStreetMap listings. Availability data only ever comes from verified
+ * pharmacies (PUBLIC_PHARMACY_WHERE), so a listing can never look like it has stock.
+ */
+export const PUBLIC_DIRECTORY_WHERE = {
+  isActive: true,
+  OR: [{ isVerified: true }, { dataSource: PharmacySource.OSM }],
+} satisfies Prisma.PharmacyWhereInput;
+
 export const pharmacyPublicSelect = {
   id: true,
   name: true,
@@ -30,6 +40,8 @@ export const pharmacyPublicSelect = {
   email: true,
   isDemo: true,
   isVerified: true,
+  dataSource: true,
+  externalId: true,
 } as const satisfies Prisma.PharmacySelect;
 
 interface NearbyRow {
@@ -49,16 +61,25 @@ export class PharmaciesService {
   // ---------- Public ----------
 
   async list(query: ListPharmaciesQueryDto) {
-    const where: Prisma.PharmacyWhereInput = { ...PUBLIC_PHARMACY_WHERE };
-    if (query.city) where.city = { equals: query.city, mode: 'insensitive' };
+    const and: Prisma.PharmacyWhereInput[] = [query.participating ? PUBLIC_PHARMACY_WHERE : PUBLIC_DIRECTORY_WHERE];
+    if (query.city) and.push({ city: { equals: query.city, mode: 'insensitive' } });
     if (query.q) {
-      where.OR = [
-        { name: { contains: query.q, mode: 'insensitive' } },
-        { address: { contains: query.q, mode: 'insensitive' } },
-      ];
+      and.push({
+        OR: [
+          { name: { contains: query.q, mode: 'insensitive' } },
+          { address: { contains: query.q, mode: 'insensitive' } },
+        ],
+      });
     }
+    const where: Prisma.PharmacyWhereInput = { AND: and };
     const [items, total] = await this.prisma.$transaction([
-      this.prisma.pharmacy.findMany({ where, select: pharmacyPublicSelect, orderBy: { name: 'asc' }, ...skipTake(query) }),
+      this.prisma.pharmacy.findMany({
+        where,
+        select: pharmacyPublicSelect,
+        // Participating (verified) pharmacies first.
+        orderBy: [{ isVerified: 'desc' }, { name: 'asc' }],
+        ...skipTake(query),
+      }),
       this.prisma.pharmacy.count({ where }),
     ]);
     return paginate(items, total, query.page, query.pageSize);
@@ -67,14 +88,14 @@ export class PharmaciesService {
   async cities() {
     const rows = await this.prisma.pharmacy.groupBy({
       by: ['city'],
-      where: PUBLIC_PHARMACY_WHERE,
+      where: PUBLIC_DIRECTORY_WHERE,
       _count: { _all: true },
       orderBy: { city: 'asc' },
     });
     return rows.map((r) => ({ city: r.city, pharmacyCount: r._count._all }));
   }
 
-  /** Verified pharmacies within `radiusKm`, nearest first (bounding box + Haversine in SQL). */
+  /** Directory pharmacies within `radiusKm`, nearest first (bounding box + Haversine in SQL). */
   async nearby(query: NearbyQueryDto) {
     const box = boundingBox(query.lat, query.lng, query.radiusKm);
     const rows = await this.prisma.$queryRaw<NearbyRow[]>`
@@ -86,7 +107,7 @@ export class PharmaciesService {
             power(sin(radians(p."longitude" - ${query.lng}) / 2), 2)
           ))) AS distance_km
         FROM "Pharmacy" p
-        WHERE p."isVerified" = true AND p."isActive" = true
+        WHERE p."isActive" = true AND (p."isVerified" = true OR p."dataSource" = 'OSM')
           AND p."latitude" BETWEEN ${box.minLat} AND ${box.maxLat}
           AND p."longitude" BETWEEN ${box.minLon} AND ${box.maxLon}
       ) d
@@ -104,10 +125,14 @@ export class PharmaciesService {
 
   async findPublic(idOrSlug: string) {
     const pharmacy = await this.prisma.pharmacy.findFirst({
-      where: { ...PUBLIC_PHARMACY_WHERE, OR: [{ id: idOrSlug }, { slug: idOrSlug }] },
-      select: { ...pharmacyPublicSelect, verifiedAt: true },
+      where: { AND: [PUBLIC_DIRECTORY_WHERE, { OR: [{ id: idOrSlug }, { slug: idOrSlug }] }] },
+      select: { ...pharmacyPublicSelect, verifiedAt: true, sourceUpdatedAt: true },
     });
     if (!pharmacy) throw new NotFoundException('Pharmacy not found');
+    if (!pharmacy.isVerified) {
+      // Directory listing: no inventory is reported, so there are no stats to show.
+      return { ...pharmacy, stats: null };
+    }
     const [inventoryCount, availableCount, latest] = await Promise.all([
       this.prisma.pharmacyInventory.count({ where: { pharmacyId: pharmacy.id, isActive: true } }),
       this.prisma.pharmacyInventory.count({

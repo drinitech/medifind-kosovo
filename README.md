@@ -61,6 +61,16 @@ Optional Redis for BullMQ: `docker compose --profile redis up -d`, then set `RED
 
 Demo accounts come from `SEED_*` variables. Leave a password empty and the seed generates one and prints it once. The seed refuses to run when `NODE_ENV=production`.
 
+### Real pharmacy directory (OpenStreetMap)
+
+```bash
+pnpm --filter api import:osm --dry-run   # report what would change
+pnpm --filter api import:osm             # upsert Kosovo pharmacies from OpenStreetMap
+pnpm --filter api remove:demo            # delete the fictional seed pharmacies and demo accounts
+```
+
+`import:osm` loads every `amenity=pharmacy` inside Kosovo's 38 municipality boundaries (© OpenStreetMap contributors, ODbL) as **directory listings** (`dataSource = OSM`). Listings appear in the pharmacy list, on the map and on their profile page, but never in availability results. They show as "Nuk raporton inventar" until a real pharmacy claims them: the admin grants the pharmacy's account access via **Shto menaxher** and then **Verifiko**. Re-running the import is safe — it upserts by OSM id, never overwrites claimed listings, and deactivates unclaimed listings that disappeared from OSM. OSM coverage is uneven (many entries have no street address or phone), so treat it as a starting directory, not an authoritative registry.
+
 ## Tests
 
 ```bash

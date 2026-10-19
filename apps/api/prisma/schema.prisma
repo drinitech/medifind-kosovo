@@ -71,6 +71,13 @@ enum NotificationStatus {
   FAILED
 }
 
+/// Where a pharmacy record came from.
+enum PharmacySource {
+  REGISTRATION
+  OSM
+  SEED
+}
+
 enum ImportBatchStatus {
   PREVIEWED
   COMMITTED
@@ -100,23 +107,27 @@ model User {
 }
 
 model Pharmacy {
-  id           String    @id @default(cuid())
-  name         String
-  slug         String    @unique
-  address      String
-  city         String
-  latitude     Float
-  longitude    Float
-  phone        String?
-  email        String?
+  id              String         @id @default(cuid())
+  name            String
+  slug            String         @unique
+  address         String?
+  city            String
+  latitude        Float
+  longitude       Float
+  phone           String?
+  email           String?
   // Fictional demonstration data must never be presented as real-world information.
-  isDemo       Boolean   @default(false)
-  isVerified   Boolean   @default(false)
-  verifiedAt   DateTime?
-  verifiedById String?
-  isActive     Boolean   @default(true)
-  createdAt    DateTime  @default(now())
-  updatedAt    DateTime  @updatedAt
+  isDemo          Boolean        @default(false)
+  // OSM listings are public directory entries that do not report inventory until claimed and verified.
+  dataSource      PharmacySource @default(REGISTRATION)
+  externalId      String?        @unique
+  sourceUpdatedAt DateTime?
+  isVerified      Boolean        @default(false)
+  verifiedAt      DateTime?
+  verifiedById    String?
+  isActive        Boolean        @default(true)
+  createdAt       DateTime       @default(now())
+  updatedAt       DateTime       @updatedAt
 
   verifiedBy    User?                @relation("PharmacyVerifiedBy", fields: [verifiedById], references: [id], onDelete: SetNull)
   memberships   PharmacyMembership[]
@@ -126,6 +137,7 @@ model Pharmacy {
 
   @@index([city])
   @@index([isVerified, isActive])
+  @@index([dataSource, isActive])
   @@index([latitude, longitude])
 }
 

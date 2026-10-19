@@ -19,6 +19,7 @@ import {
   MembershipRole,
   NotificationStatus,
   NotificationType,
+  PharmacySource,
   PrismaClient,
   Role,
 } from '@prisma/client';
@@ -145,6 +146,7 @@ async function main() {
       phone: p.phone ? `+383 00 000 ${String(101 + i).padStart(3, '0')}` : null,
       email: null,
       isDemo: true,
+      dataSource: PharmacySource.SEED,
       isActive: true,
       isVerified: p.verified,
       verifiedAt: p.verified ? new Date() : null,

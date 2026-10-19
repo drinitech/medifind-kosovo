@@ -6,7 +6,7 @@ import { DemoBadge, FreshnessBadge, StatusBadge } from "@/components/common/stat
 import { Button } from "@/components/ui/button";
 import { Card } from "@/components/ui/card";
 import { Tooltip, TooltipContent, TooltipTrigger } from "@/components/ui/tooltip";
-import { dateTime, directionsHref, km, telHref, timeAgo } from "@/lib/format";
+import { dateTime, directionsHref, km, telHref, timeAgo, placeLabel } from "@/lib/format";
 import { SOURCE_LABELS } from "@/lib/labels";
 import type { AvailabilityRow } from "@/lib/types";
 import { cn } from "@/lib/utils";
@@ -33,7 +33,7 @@ export function AvailabilityCard({
           </div>
           <p className="flex items-center gap-1.5 text-sm text-muted-foreground">
             <MapPin className="size-3.5 shrink-0" aria-hidden />
-            {p.address}, {p.city}
+            {placeLabel(p)}
             {row.distanceKm !== null ? <span className="font-medium text-foreground">· {km(row.distanceKm)}</span> : null}
           </p>
         </div>
