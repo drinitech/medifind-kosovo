@@ -1,0 +1,304 @@
+// MediFind Kosovo — relational schema.
+// Code identifiers are English; user-facing text lives in the web app (Albanian).
+
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "postgresql"
+}
+
+enum Role {
+  USER
+  PHARMACY_MANAGER
+  ADMIN
+}
+
+enum MembershipRole {
+  OWNER
+  STAFF
+}
+
+enum AvailabilityStatus {
+  IN_STOCK
+  LOW_STOCK
+  OUT_OF_STOCK
+  UNKNOWN
+}
+
+enum InventorySource {
+  MANUAL
+  IMPORT
+  API
+  SCHEDULED_IMPORT
+  SEED
+}
+
+enum DosageForm {
+  TABLET
+  CAPSULE
+  SYRUP
+  SUSPENSION
+  SOLUTION
+  INJECTION
+  CREAM
+  OINTMENT
+  GEL
+  DROPS
+  SPRAY
+  INHALER
+  SUPPOSITORY
+  POWDER
+  PATCH
+  OTHER
+}
+
+enum NotificationType {
+  AVAILABILITY_ALERT
+  PHARMACY_VERIFIED
+  SYSTEM
+}
+
+enum NotificationChannel {
+  IN_APP
+  EMAIL
+}
+
+enum NotificationStatus {
+  PENDING
+  SENT
+  FAILED
+}
+
+enum ImportBatchStatus {
+  PREVIEWED
+  COMMITTED
+  EXPIRED
+}
+
+model User {
+  id           String   @id @default(cuid())
+  fullName     String
+  email        String   @unique
+  passwordHash String
+  role         Role     @default(USER)
+  isActive     Boolean  @default(true)
+  createdAt    DateTime @default(now())
+  updatedAt    DateTime @updatedAt
+
+  memberships        PharmacyMembership[]
+  inventoryChanges   InventoryHistory[]
+  alerts             AvailabilityAlert[]
+  notifications      Notification[]
+  auditLogs          AuditLog[]
+  importBatches      ImportBatch[]
+  verifiedPharmacies Pharmacy[]           @relation("PharmacyVerifiedBy")
+
+  @@index([role])
+  @@index([createdAt])
+}
+
+model Pharmacy {
+  id           String    @id @default(cuid())
+  name         String
+  slug         String    @unique
+  address      String
+  city         String
+  latitude     Float
+  longitude    Float
+  phone        String?
+  email        String?
+  // Fictional demonstration data must never be presented as real-world information.
+  isDemo       Boolean   @default(false)
+  isVerified   Boolean   @default(false)
+  verifiedAt   DateTime?
+  verifiedById String?
+  isActive     Boolean   @default(true)
+  createdAt    DateTime  @default(now())
+  updatedAt    DateTime  @updatedAt
+
+  verifiedBy    User?                @relation("PharmacyVerifiedBy", fields: [verifiedById], references: [id], onDelete: SetNull)
+  memberships   PharmacyMembership[]
+  inventory     PharmacyInventory[]
+  history       InventoryHistory[]
+  importBatches ImportBatch[]
+
+  @@index([city])
+  @@index([isVerified, isActive])
+  @@index([latitude, longitude])
+}
+
+model PharmacyMembership {
+  id         String         @id @default(cuid())
+  userId     String
+  pharmacyId String
+  role       MembershipRole @default(OWNER)
+  createdAt  DateTime       @default(now())
+
+  user     User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+  pharmacy Pharmacy @relation(fields: [pharmacyId], references: [id], onDelete: Cascade)
+
+  @@unique([userId, pharmacyId])
+  @@index([pharmacyId])
+}
+
+model Medicine {
+  id                   String      @id @default(cuid())
+  // Optional catalog identifier (e.g. a national registry code) used for imports.
+  catalogCode          String?     @unique
+  name                 String
+  normalizedName       String
+  activeIngredient     String?
+  normalizedIngredient String?
+  strength             String?
+  dosageForm           DosageForm?
+  packageSize          String?
+  manufacturer         String?
+  isActive             Boolean     @default(true)
+  createdAt            DateTime    @default(now())
+  updatedAt            DateTime    @updatedAt
+
+  inventory PharmacyInventory[]
+  alerts    AvailabilityAlert[]
+
+  @@index([normalizedName(ops: raw("gin_trgm_ops"))], type: Gin, map: "Medicine_normalizedName_trgm_idx")
+  @@index([normalizedIngredient(ops: raw("gin_trgm_ops"))], type: Gin, map: "Medicine_normalizedIngredient_trgm_idx")
+  @@index([dosageForm])
+  @@index([isActive, normalizedName])
+}
+
+model PharmacyInventory {
+  id                   String             @id @default(cuid())
+  pharmacyId           String
+  medicineId           String
+  availabilityStatus   AvailabilityStatus @default(UNKNOWN)
+  quantity             Int?
+  showQuantityPublicly Boolean            @default(false)
+  isActive             Boolean            @default(true)
+  lastReportedAt       DateTime           @default(now())
+  source               InventorySource    @default(MANUAL)
+  createdAt            DateTime           @default(now())
+  updatedAt            DateTime           @updatedAt
+
+  pharmacy Pharmacy           @relation(fields: [pharmacyId], references: [id], onDelete: Restrict)
+  medicine Medicine           @relation(fields: [medicineId], references: [id], onDelete: Restrict)
+  history  InventoryHistory[]
+
+  // One inventory record per pharmacy + medicine (medicine already encodes strength/form/package).
+  @@unique([pharmacyId, medicineId])
+  @@index([medicineId, isActive, availabilityStatus])
+  @@index([pharmacyId, isActive])
+  @@index([lastReportedAt])
+}
+
+model InventoryHistory {
+  id                  String              @id @default(cuid())
+  pharmacyInventoryId String
+  pharmacyId          String
+  previousStatus      AvailabilityStatus?
+  newStatus           AvailabilityStatus
+  previousQuantity    Int?
+  newQuantity         Int?
+  previousIsActive    Boolean?
+  newIsActive         Boolean             @default(true)
+  changedByUserId     String?
+  source              InventorySource
+  importBatchId       String?
+  createdAt           DateTime            @default(now())
+
+  inventory     PharmacyInventory @relation(fields: [pharmacyInventoryId], references: [id], onDelete: Restrict)
+  pharmacy      Pharmacy          @relation(fields: [pharmacyId], references: [id], onDelete: Restrict)
+  changedBy     User?             @relation(fields: [changedByUserId], references: [id], onDelete: SetNull)
+  importBatch   ImportBatch?      @relation(fields: [importBatchId], references: [id], onDelete: SetNull)
+  notifications Notification[]
+
+  @@index([pharmacyId, createdAt])
+  @@index([pharmacyInventoryId, createdAt])
+  @@index([createdAt])
+}
+
+model ImportBatch {
+  id          String            @id @default(cuid())
+  pharmacyId  String
+  userId      String?
+  fileName    String
+  status      ImportBatchStatus @default(PREVIEWED)
+  totalRows   Int
+  validRows   Int
+  errorRows   Int
+  // Validated rows awaiting confirmation; the client only sends back the batch id.
+  payload     Json
+  report      Json?
+  expiresAt   DateTime
+  committedAt DateTime?
+  createdAt   DateTime          @default(now())
+
+  pharmacy Pharmacy           @relation(fields: [pharmacyId], references: [id], onDelete: Cascade)
+  user     User?              @relation(fields: [userId], references: [id], onDelete: SetNull)
+  history  InventoryHistory[]
+
+  @@index([pharmacyId, createdAt])
+}
+
+model AvailabilityAlert {
+  id             String    @id @default(cuid())
+  userId         String
+  medicineId     String
+  preferredCity  String?
+  latitude       Float?
+  longitude      Float?
+  radiusKm       Float?
+  isActive       Boolean   @default(true)
+  lastNotifiedAt DateTime?
+  createdAt      DateTime  @default(now())
+  updatedAt      DateTime  @updatedAt
+
+  user          User           @relation(fields: [userId], references: [id], onDelete: Cascade)
+  medicine      Medicine       @relation(fields: [medicineId], references: [id], onDelete: Cascade)
+  notifications Notification[]
+
+  @@index([medicineId, isActive])
+  @@index([userId, isActive])
+}
+
+model Notification {
+  id                 String              @id @default(cuid())
+  userId             String
+  alertId            String?
+  inventoryHistoryId String?
+  type               NotificationType
+  channel            NotificationChannel @default(IN_APP)
+  title              String
+  message            String
+  link               String?
+  status             NotificationStatus  @default(PENDING)
+  // Guarantees one notification per (alert, availability event).
+  dedupeKey          String?             @unique
+  readAt             DateTime?
+  sentAt             DateTime?
+  createdAt          DateTime            @default(now())
+
+  user             User               @relation(fields: [userId], references: [id], onDelete: Cascade)
+  alert            AvailabilityAlert? @relation(fields: [alertId], references: [id], onDelete: SetNull)
+  inventoryHistory InventoryHistory?  @relation(fields: [inventoryHistoryId], references: [id], onDelete: SetNull)
+
+  @@index([userId, readAt])
+  @@index([userId, createdAt])
+}
+
+model AuditLog {
+  id         String   @id @default(cuid())
+  userId     String?
+  action     String
+  entityType String
+  entityId   String?
+  metadata   Json?
+  createdAt  DateTime @default(now())
+
+  user User? @relation(fields: [userId], references: [id], onDelete: SetNull)
+
+  @@index([entityType, entityId])
+  @@index([action])
+  @@index([createdAt])
+}

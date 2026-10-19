@@ -1,0 +1,35 @@
+# Local infrastructure for MediFind Kosovo.
+#   docker compose up -d postgres           # database only
+#   docker compose --profile redis up -d    # + Redis for BullMQ background jobs
+services:
+  postgres:
+    image: postgis/postgis:17-3.5
+    container_name: medifind-postgres
+    environment:
+      POSTGRES_USER: medifind
+      POSTGRES_PASSWORD: medifind_dev_only   # local development only — never reuse elsewhere
+      POSTGRES_DB: medifind
+    ports:
+      - "5432:5432"
+    volumes:
+      - medifind-pg:/var/lib/postgresql/data
+      - ./infra/postgres/init.sql:/docker-entrypoint-initdb.d/init.sql:ro
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U medifind -d medifind"]
+      interval: 5s
+      timeout: 5s
+      retries: 10
+
+  redis:
+    image: redis:7-alpine
+    container_name: medifind-redis
+    profiles: ["redis"]
+    ports:
+      - "6379:6379"
+    healthcheck:
+      test: ["CMD", "redis-cli", "ping"]
+      interval: 5s
+      retries: 10
+
+volumes:
+  medifind-pg:

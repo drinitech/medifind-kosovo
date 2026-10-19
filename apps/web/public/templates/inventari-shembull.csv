@@ -1,0 +1,5 @@
+medicine_code,medicine_name,strength,dosage_form,quantity,availability_status,show_quantity_publicly
+DEMO-0001,,,,24,,po
+,Ibuprofen,400 mg,tableta,3,,jo
+DEMO-0006,,,,0,,
+DEMO-0021,,,,,LOW_STOCK,
