@@ -1,5 +1,7 @@
 # MediFind Kosovo
 
+[![CI](https://github.com/drinitech/medifind-kosovo/actions/workflows/ci.yml/badge.svg)](https://github.com/drinitech/medifind-kosovo/actions/workflows/ci.yml)
+
 A platform for finding medicines in Kosovo pharmacies: search for a medicine, see which **verified** pharmacies **report** it as available, where they are, and when their inventory was last updated.
 
 > MediFind shows availability **as reported by pharmacies**. It is not confirmed real-time stock — the UI always says *"Disponueshmëria e raportuar — kontakto farmacinë për konfirmim."* and flags outdated reports.
