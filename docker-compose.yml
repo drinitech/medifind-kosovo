@@ -1,6 +1,7 @@
 # Local infrastructure for MediFind Kosovo.
 #   docker compose up -d postgres           # database only
 #   docker compose --profile redis up -d    # + Redis for BullMQ background jobs
+#   docker compose up -d --build api        # API in Docker (uses apps/api/.env)
 services:
   postgres:
     image: postgis/postgis:17-3.5
@@ -30,6 +31,16 @@ services:
       test: ["CMD", "redis-cli", "ping"]
       interval: 5s
       retries: 10
+
+  api:
+    build:
+      context: .
+      dockerfile: apps/api/Dockerfile
+    container_name: medifind-api
+    env_file: ./apps/api/.env
+    ports:
+      - "${API_PORT:-4000}:4000"
+    restart: unless-stopped
 
 volumes:
   medifind-pg:
