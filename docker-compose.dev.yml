@@ -1,0 +1,13 @@
+# Dev mode for the API: apps/api/src is bind-mounted and the API recompiles + restarts on every change.
+#   docker compose -f docker-compose.yml -f docker-compose.dev.yml up -d --build api
+# Back to the production image:  docker compose up -d --build api
+# Changes to package.json or prisma/schema.prisma need a rebuild (--build).
+services:
+  api:
+    image: medifind-kosovo-api:dev
+    build:
+      context: .
+      dockerfile: apps/api/Dockerfile
+      target: dev
+    volumes:
+      - ./apps/api/src:/app/apps/api/src
